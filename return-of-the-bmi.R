@@ -144,9 +144,9 @@ nut_data <- addWGSR(
   index = "bfa"
 )
 
-### Classify BMI-for-age z-score using ifelse ----
+### Classify BMI-for-age z-score using ifelse (Approach 1) ----
 
-nut_data$bmi_classification <- ifelse(
+nut_data$bmiz_classification_1 <- ifelse(
   nut_data$bfaz > 2, "obese",
   ifelse(
     nut_data$bfaz > 1 & nut_data$bfaz <= 2, "overweight",
@@ -159,14 +159,14 @@ nut_data$bmi_classification <- ifelse(
   )
 )
 
-### Classify BMI-for-age z-score using classify_bmi_children function ----
+### Classify BMI-for-age z-score using classify_bmi_children function (Approach 2) ----
 
-nut_data$bmi_classification <- classify_bmi_children(nut_data$bfaz)
+nut_data$bmiz_classification_2 <- classify_bmi_children(nut_data$bfaz)
 
-### Classify BMI-for-age z-score using dplyr ----
+### Classify BMI-for-age z-score using dplyr (Approach 3) ----
 nut_data <- nut_data %>%
   mutate(
-    bmiz_classification = case_when(
+    bmiz_classification_3 = case_when(
       bfaz > 2 ~ "obese",
       bfaz > 1 & bfaz <= 2 ~ "overweight",
       bfaz >= -3 & bfaz < -2 ~ "thin",
@@ -175,7 +175,7 @@ nut_data <- nut_data %>%
     )
   )
 
-### Classify BMI-for-age z-score using dplyr and classify_bmi_children function ----
+### Classify BMI-for-age z-score using dplyr and classify_bmi_children function (Approach 4) ----
 nut_data <- nut_data %>%
-  mutate(bmiz_classification = classify_bmi_children(bfaz))
+  mutate(bmiz_classification_4 = classify_bmi_children(bfaz))
 
