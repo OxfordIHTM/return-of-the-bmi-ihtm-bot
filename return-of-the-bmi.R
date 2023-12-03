@@ -3,6 +3,7 @@
 
 ## Load libraries ----
 library(dplyr)        ## for data manipulation
+library(tidyr)        ## for data manipulation to complement dplyr
 library(openxlsx)     ## for reading XLSX files
 library(zscorer)      ## for calculating z-scores
 
@@ -179,3 +180,182 @@ nut_data <- nut_data %>%
 nut_data <- nut_data %>%
   mutate(bmiz_classification_4 = classify_bmi_children(bfaz))
 
+
+## Data analysis ----
+
+### Testing the normality of the BMI-for-age z-score ----
+
+#### Boxplot of BMI-for-age z-score ----
+
+boxplot(nut_data$bfaz,
+        ylab = "BMI-for-age z-score",                ## Add y-axis label
+        main = "Boxplot of BMI-for-age z-score",     ## add a title to plot
+        frame.plot = FALSE)                          ## remove plot frame
+
+boxplot(bfaz ~ sex,                                  ## use formula method
+        data = nut_data,
+        names = c("Male", "Female"),                 ## Name each boxplot instead of 1 and 2
+        ylab = "BMI-for-age z-score",
+        main = "Boxplot of BMI-for-age z-score by sex",
+        frame.plot = FALSE)
+
+#### Histogram of BMI-for-age z-score ----
+
+##### Histogram of BMI-for-age z-score for all students ----
+hist(nut_data$bfaz,
+     xlab = "BMI-for-age z-score",
+     main = "Distribution of BMI-for-age z-score")
+
+##### Histogram of BMI-for-age z-score by sex ----
+par(mfrow = c(1, 2))        ## Create 2 plotting regions side-by-side
+
+with(
+  nut_data,
+  {
+    hist(bfaz[sex == 1],    ## bfaz for males
+         xlim = c(-7, 2),   ## expand limits of x-axis
+         ylim = c(0, 50),   ## set limits of y-axis
+         xlab = "Male",     ## set x-axis label to Male
+         main = "")         ## remove plot title for males
+    hist(bfaz[sex == 2],    ## bfaz for females
+         xlim = c(-7, 2),   ## expand limits of x-axis
+         ylim = c(0, 50),   ## set limits of y-axis
+         xlab = "Female",   ## set x-axis label to Female
+         main = "")         ## remove plot title for females
+  }
+)
+
+par(mfrow = c(1, 1))        ## return graphical window back to one plot region
+title(
+  main = "Distribution of BMI-for-age z-score by sex",
+  xlab = "BMI-for-age z-score"
+)
+
+#### Test normality of BMI-for-age z-score statistically ----
+
+##### Test normality of BMI-for-age z-score for all students ----
+shapiro.test(nut_data$bfaz)
+
+##### Test normality of BMI-for-age z-score for male and female students ----
+with(nut_data, tapply(bfaz, sex, shapiro.test))
+
+
+## Summarising BMI data using base R functions ----
+
+### Mean bfaz
+mean_overall_bfaz <- mean(nut_data$bfaz)                     ## Overall mean
+mean_sex_bfaz <- with(nut_data, tapply(bfaz, sex, mean))     ## mean by sex
+mean_bfaz <- c(mean_sex_bfaz, mean_overall_bfaz)             ## concatenate
+names(mean_bfaz) <- c("Males", "Females", "Overall")
+
+### classify nutrition status to undernourished and overnourished ----
+nut_data$nut_status <- ifelse(
+  nut_data$bmiz_classification_4 %in% c("thin", "severely thin"), "undernourished",
+  ifelse(
+    nut_data$bmiz_classification_4 %in% c("normal"), "normal", "overnourished"
+  )
+)
+
+### Tabulate numbers by nutrition status ----
+nut_count_overall <- with(nut_data, table(nut_status))   ## overall counts
+nut_count_sex <- with(nut_data, table(sex, nut_status))  ## counts by sex
+
+nut_status_count <- data.frame(                          ## concatenate to 
+  rbind(nut_count_sex, nut_count_overall)                ## single table
+)
+row.names(nut_status_count) <- c("Males", "Females", "Overall") ## tidy row names
+
+### Tabulate proportions by nutrition status ----
+nut_prop_overall <- prop.table(nut_count_overall)         ## overall proportions
+nut_prop_sex <- prop.table(nut_count_sex)                 ## proportions by sex
+
+nut_status_prop <- data.frame(                            ## concatenate to
+  rbind(nut_prop_sex, nut_prop_overall)                   ## single table
+)
+row.names(nut_status_prop) <- c("Males", "Females", "Overall")  ## tidy row names
+
+### Combine counts and proportions ----
+nut_status_tab <- data.frame(nut_status_count, nut_status_prop)
+names(nut_status_tab) <- c(
+  "n_normal", "n_overnourished", "n_undernourished", 
+  "prop_normal", "prop_overnourished", "prop_undernourished"
+)
+
+### Add mean bmi-for-age z-score to table ----
+nut_status_tab <- data.frame(
+  mean_bfaz, nut_status_tab
+)
+
+### Arrange table columns ----
+nut_status_tab <- nut_status_tab[ , c("mean_bfaz", "n_normal", "prop_normal", "n_overnourished", "prop_overnourished", "n_undernourished", "prop_undernourished")]
+
+
+## Summarising BMI data using dplyr and tidyr functions ----
+
+nut_status_summary <- nut_data %>%
+  group_by(sex) %>%
+  summarise(mean_bfaz = mean(bfaz), .groups = "drop") %>%   ## get mean z-score by sex
+  mutate(sex = ifelse(sex == 1, "Males", "Females")) %>%    ## recode sex
+  rbind(
+    nut_data %>% 
+      summarise(sex = "Overall", mean_bfaz = mean(bfaz))    ## Get mean z-score for all
+  ) %>%
+  left_join(
+    nut_data %>%
+      mutate(n_total = n()) %>%
+      group_by(sex) %>%
+      add_count(nut_status) %>%         ## count per nut_status value
+      group_by(sex, nut_status) %>%
+      summarise(n_total = unique(n_total), n = unique(n), .groups = "drop") %>%
+      mutate(prop = n / n_total) %>%    ## calculate proportion of nut_status by sex
+      pivot_wider(names_from = nut_status, values_from = n:prop) %>%    ## spread the table
+      mutate(sex = ifelse(sex == 1, "Males", "Females")) %>%            ## recode sex
+      select(-n_total) %>%                                              ## remove n_total column           
+      rbind(
+        nut_data %>%
+          mutate(n_total = n()) %>%
+          add_count(nut_status) %>%
+          group_by(nut_status) %>%
+          summarise(n_total = unique(n_total), n = unique(n), .groups = "drop") %>%
+          mutate(prop = n / n_total) %>%
+          pivot_wider(names_from = nut_status, values_from = n:prop) %>%
+          mutate(sex = "Overall", .before = n_total) %>%
+          select(-n_total)
+      ),
+    by = "sex"
+  ) %>%
+  mutate(n_overnourished = ifelse(is.na(n_overnourished), 0, n_overnourished))
+
+
+## Statistical tests ----
+
+### Test whether difference in mean z-score for males and females is ----
+### statistically significant
+
+#### t.test for difference in mean BMI-for-age z-score for males and females ---
+#### using default method
+t_test_result <- t.test(
+  x = nut_data$bfaz[nut_data$sex == 1], 
+  y = nut_data$bfaz[nut_data$sex == 2]
+)
+
+#### t.test for difference in mean BMI-for-age z-score for males and females ---
+#### using formula method
+t_test_result <- t.test(bfaz ~ sex, data = nut_data)
+
+### Test whether the nutritional status distribution in males and females ----
+### is statistically significant
+chisq.test(with(nut_data, table(nut_status, sex)), simulate.p.value = TRUE)
+fisher.test(with(nut_data, table(nut_status, sex)), simulate.p.value = TRUE)
+
+### Test whether proportion of overnourished is different between males ----
+### and females using chi-square test or fisher exact test
+nut_data$overnourished <- ifelse(nut_data$nut_status == "overnourished", 1, 0)
+chisq.test(with(nut_data, table(overnourished, sex)), simulate.p.value = TRUE)
+fisher.test(with(nut_data, table(overnourished, sex)))
+
+### Test whether proportion of undernourished is different between males ----
+### and females using chi-square test or fisher exact test
+nut_data$undernourished <- ifelse(nut_data$nut_status == "undernourished", 1, 0)
+chisq.test(with(nut_data, table(undernourished, sex)), simulate.p.value = TRUE)
+fisher.test(with(nut_data, table(undernourished, sex)))
