@@ -396,11 +396,11 @@ format) with the rows for values for males, females, and overall and
 columns showing the summaries of interest (mean, sum, proportion) as
 shown in the dummy table below:
 
-| **grouping** | **mean_bfaz** | **n_undernourished** | **prop_undernourished** | **n_overnourished** |
-|:-------------|:--------------|:---------------------|:------------------------|:--------------------|
-| **females**  |               |                      |                         |                     |
-| **males**    |               |                      |                         |                     |
-| **overall**  |               |                      |                         |                     |
+| **grouping** | **mean_bfaz** | **n_undernourished** | **prop_undernourished** | **n_overnourished** | **prop_overnourished** |
+|:-------------|:--------------|:---------------------|:------------------------|:--------------------|:-----------------------|
+| **females**  |               |                      |                         |                     |                        |
+| **males**    |               |                      |                         |                     |                        |
+| **overall**  |               |                      |                         |                     |                        |
 
 **Summary table of BMI-for-age z-scores by sex and overall**
 

@@ -294,10 +294,10 @@ Please show your results as rectangular data (data.frame or table format) with t
 
 
 **grouping** | **mean_bfaz** | **n_undernourished** | **prop_undernourished** | **n_overnourished** | **prop_overnourished**
-:--- | :--- | :--- | :--- | :---
-**females** | &nbsp; | &nbsp; | &nbsp; | &nbsp;
-**males** | &nbsp; | &nbsp; | &nbsp; | &nbsp;
-**overall** | &nbsp; | &nbsp; | &nbsp; | &nbsp;
+:--- | :--- | :--- | :--- | :--- | :---
+**females** | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp;
+**males** | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp;
+**overall** | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp;
 
 **Summary table of BMI-for-age z-scores by sex and overall**
 
@@ -357,6 +357,8 @@ knitr::kable(x = nut_status_tab)
 Knowing what you know now about performing statistical tests from your Epi/Stats lectures, please answer the following questions by writing appropriate R code/script:
 
 * Is there a difference between the mean BMI-for-age z-score of male students compared to the female students?
+
+
 
 * Is there a difference between the proportion of undernourished male students compared to undernourished female students?
 
