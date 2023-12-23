@@ -9,6 +9,14 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+## Load dependencies
+library(openxlsx)
+library(dplyr)
+library(zscorer)
+
+## Read nutrition data
+nut_data <- read.csv("data/school_nutrition.csv")
 ```
 
 # Return of the BMI (Data processing and statistical analysis in R)
@@ -16,7 +24,7 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 <!-- badges: end -->
 
-This repository is an exercise in processing data and performing statistical analysis in R using a dataset from a Pakistan school nutrition survey of students older than 10 years old.
+This repository is an exercise in processing data and performing statistical analysis in **R** using a dataset from a Pakistan school nutrition survey of students older than 10 years old.
 
 By this time, you should already know how to clone this repository into your local machine using RStudio. If you need a refresher, the following tutorial shows the steps on how to do this - https://oxford-ihtm.io/ihtm-handbook/clone-repository.html.
 
@@ -36,15 +44,95 @@ For this task, you should look into ways to get back the school nutrition data a
 
 1. Looking deeper into the `read.table()` function (`?read.table`), is there a way to read a CSV file directly from a URL or web link? If so, write code that does this.
 
+**Here is the code that will read the data from a URL:**
+
+```{r read_data}
+nut_data <- read.csv(file = "https://raw.githubusercontent.com/OxfordIHTM/teaching_datasets/main/school_nutrition.csv")
+```
+
+The school nutrition dataset contained in the `nut_data` object has **`r nrow(nut_data)`** records and **`r ncol(nut_data)`** variables. The `nut_data` object looks like this (showing first 10 records in the data):
+
+```{r show_data, echo = FALSE}
+## set echo = FALSE so that R code chunk will not show in report
+nut_data[1:10, ] %>%
+  knitr::kable()
+```
+
+
 2. You may want to be able to download the dataset and save it back into the `data` directory. The function `download.file()` (`?download.file`) can be used for this purpose. Write code that would download the CSV file into the `data` directory of the project and then read the CSV file from the `data` directory into R.
 
+**Here is code that will download data from URL into the `data` folder:**
+
+```{r download_csv}
+download.file(
+  url = "https://raw.githubusercontent.com/OxfordIHTM/teaching_datasets/main/school_nutrition.csv",
+  destfile = "data/schoo_nutrition.csv"
+)
+```
+
+**And here is code that will read that file from the `data` folder:**
+
+```{r read_download_csv}
+nut_data <- read.csv(file = "data/school_nutrition.csv")
+```
+
+This approach gives the same result as the earlier approach as shown below (showing first 10 records only):
+
+```{r show_download_csv, echo = FALSE}
+nut_data[1:10, ] %>%
+  knitr::kable()
+```
+
 3. It would be good to learn how to read data from an XLSX file as it will not be uncommon these days to have data in XLSX format. For this purpose, the `openxlsx` package will be useful, specifically its `read.xlsx()` function. Install `openxlsx` (if you haven't done so already), load it into your environment (`library(openxlsx)`), and then read up on the `read.xlsx()` function (`?read.xlsx`) to figure out how to read the `student_nutrition.xlsx` file via URL using the `read.xlsx()` function. Write code that shows these steps.
+
+**Here is code that will read the XLSX file for the school nutrition data into R:**
+
+```{r read_xlsx}
+nut_data <- read.xlsx(
+  xlsxFile = "https://raw.githubusercontent.com/OxfordIHTM/teaching_datasets/main/school_nutrition.xlsx",
+  sheet = 1
+)
+```
+
+We expect that the data in the `XLSX` file is the same as the data in the CSV file. We confirm this as shown below (showing first 10 records only):
+
+```{r show_xlsx, echo = FALSE}
+nut_data[1:10, ] %>%
+  knitr::kable()
+```
+
 
 ## Task 2: Calculate BMI
 
 Now that you have the school nutrition data into your R environment, write code that would calculate the BMI for each student in the dataset and then add this value as a new variable called `bmi` in the student nutrition dataset object.
 
 To make this more challenging, please write a function that will specifically make this calculation of BMI. You have done this already earlier so make sure you pick up on feedback provided earlier to improve the function you have written.
+
+**Here is a function that will calculate BMI given weight and height:**
+
+```{r calculate_bmi_function}
+calculate_bmi <- function(weight, height) {
+  weight / height ^ 2
+}
+```
+
+**We can now use this function to calculate BMI of the children in the school nutrition dataset:**
+
+```{r calculate_bmi}
+nut_data$bmi <- calculate_bmi(nut_data$weight, nut_data$height / 100)
+```
+
+**The values of the BMI for each child is now included as a variable in the `nut_data` object:**
+
+```{r show_bmi}
+## Check the names of variables in `nut_data`
+names(nut_data)
+```
+
+```{r show_bmi_tab, echo = FALSE}
+nut_data[1:10, ] %>%
+  knitr::kable()
+```
 
 ## Task 3: Calculating age-standardised BMI
 
@@ -75,6 +163,61 @@ data.frame(bmi, classification) |>
   knitr::kable(col.names = c("BMI-for-age z-score range", "Classification"))
 ```
 
+We calculated the **BMI-for-age zscore** using the [`zscorer`](https://nutriverse.io/zscorer) package. Specifically, we used the `addWGSR()` function as follows:
+
+```{r calculate_bfaz}
+## Convert age in months to age in days ----
+nut_data$age_days <- nut_data$age_months * (365.25 / 12)
+
+nut_data <- addWGSR(
+  data = nut_data, 
+  sex = "sex", 
+  firstPart = "weight", 
+  secondPart = "height", 
+  thirdPart = "age_days",
+  index = "bfa"
+)
+```
+
+This creates a new variable in `nut_data` called `bfaz` as shown below (showing first 10 records only):
+
+```{r, show_bfaz, echo = FALSE}
+nut_data[1:10, ] %>%
+  knitr::kable()
+```
+
+The following function can classify the school children's BMI-for-age z-scores to their corresponding nutrition status as indicated in the table above:
+
+```{r classify_bmi_function}
+classify_bmi_children <- function(bmiz) {
+  ifelse(
+    bmiz > 2, "obese",
+    ifelse(
+      bmiz <= 2 & bmiz > 1, "overweight",
+      ifelse(
+        bmiz <= 1 & bmiz >= -2, "normal",
+        ifelse(
+          bmiz >= -3 & bmiz < -2, "thin", "severely thin"
+        )
+      )
+    )
+  )
+}
+```
+
+Applying this function on the school nutrition dataset
+
+```{r classify_bmi}
+nut_data$bmi_classification <- classify_bmi_children(nut_data$bfaz)
+```
+
+we get the following results (showing first 10 rows):
+
+```{r show_classify_bmi}
+nut_data[1:10, ] %>%
+  knitr::kable()
+```
+
 ## Task 4: Show and test the normality of the distribution of the BMI-for-age z-score variable
 
 Write code that tests the normality of the BMI variable and answer the following questions:
@@ -86,6 +229,56 @@ Write code that tests the normality of the BMI variable and answer the following
 * Is the BMI-for-age z-score of all the female students in the sample normally distributed?
 
 Please write a script that shows normality **graphically** and through **formal statistical test/s**.
+
+```{r boxplot_bfaz, fig.align = "center", fig.width = 4}
+boxplot(nut_data$bfaz,
+        ylab = "BMI-for-age z-score",                ## Add y-axis label
+        main = "Boxplot of BMI-for-age z-score",     ## add a title to plot
+        frame.plot = FALSE)
+```
+
+```{r boxplot_bfaz_sex, fig.align = "center", fig.width = 4}
+boxplot(bfaz ~ sex,                       ## use formula method
+        data = nut_data,
+        names = c("Male", "Female"),      ## Name each boxplot instead of 1 and 2
+        ylab = "BMI-for-age z-score",
+        main = "Boxplot of BMI-for-age z-score by sex",
+        frame.plot = FALSE)
+```
+
+```{r hist_bfaz, fig.align = "center"}
+##### Histogram of BMI-for-age z-score for all students ----
+hist(nut_data$bfaz,
+     xlab = "BMI-for-age z-score",
+     main = "Distribution of BMI-for-age z-score")
+```
+
+```{r hist_bfaz_sex, fig.align = "center"}
+##### Histogram of BMI-for-age z-score by sex ----
+par(mfrow = c(1, 2))        ## Create 2 plotting regions side-by-side
+
+with(
+  nut_data,
+  {
+    hist(bfaz[sex == 1],    ## bfaz for males
+         xlim = c(-7, 2),   ## expand limits of x-axis
+         ylim = c(0, 50),   ## set limits of y-axis
+         xlab = "Male",     ## set x-axis label to Male
+         main = "")         ## remove plot title for males
+    hist(bfaz[sex == 2],    ## bfaz for females
+         xlim = c(-7, 2),   ## expand limits of x-axis
+         ylim = c(0, 50),   ## set limits of y-axis
+         xlab = "Female",   ## set x-axis label to Female
+         main = "")         ## remove plot title for females
+  }
+)
+
+par(mfrow = c(1, 1))        ## return graphical window back to one plot region
+title(
+  main = "Distribution of BMI-for-age z-score by sex",
+  xlab = "BMI-for-age z-score"
+)
+```
 
 ## Task 5: Summarising BMI data
 
@@ -101,16 +294,71 @@ Please show your results as rectangular data (data.frame or table format) with t
 
 
 **grouping** | **mean_bfaz** | **n_undernourished** | **prop_undernourished** | **n_overnourished** | **prop_overnourished**
-:--- | :--- | :--- | :--- | :---
-**females** | &nbsp; | &nbsp; | &nbsp; | &nbsp;
-**males** | &nbsp; | &nbsp; | &nbsp; | &nbsp;
-**overall** | &nbsp; | &nbsp; | &nbsp; | &nbsp;
+:--- | :--- | :--- | :--- | :--- | :---
+**females** | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp;
+**males** | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp;
+**overall** | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp;
+
+**Summary table of BMI-for-age z-scores by sex and overall**
+
+```{r summary_table}
+### Mean bfaz
+mean_overall_bfaz <- mean(nut_data$bfaz)                     ## Overall mean
+mean_sex_bfaz <- with(nut_data, tapply(bfaz, sex, mean))     ## mean by sex
+mean_bfaz <- c(mean_sex_bfaz, mean_overall_bfaz)             ## concatenate
+names(mean_bfaz) <- c("Males", "Females", "Overall")
+
+### classify nutrition status to undernourished and overnourished ----
+nut_data$nut_status <- ifelse(
+  nut_data$bmi_classification %in% c("thin", "severely thin"), "undernourished",
+  ifelse(
+    nut_data$bmi_classification %in% c("normal"), "normal", "overnourished"
+  )
+)
+
+### Tabulate numbers by nutrition status ----
+nut_count_overall <- with(nut_data, table(nut_status))   ## overall counts
+nut_count_sex <- with(nut_data, table(sex, nut_status))  ## counts by sex
+
+nut_status_count <- data.frame(                          ## concatenate to 
+  rbind(nut_count_sex, nut_count_overall)                ## single table
+)
+row.names(nut_status_count) <- c("Males", "Females", "Overall") ## tidy row names
+
+### Tabulate proportions by nutrition status ----
+nut_prop_overall <- prop.table(nut_count_overall)         ## overall proportions
+nut_prop_sex <- prop.table(nut_count_sex)                 ## proportions by sex
+
+nut_status_prop <- data.frame(                            ## concatenate to
+  rbind(nut_prop_sex, nut_prop_overall)                   ## single table
+)
+row.names(nut_status_prop) <- c("Males", "Females", "Overall")  ## tidy row names
+
+### Combine counts and proportions ----
+nut_status_tab <- data.frame(nut_status_count, nut_status_prop)
+names(nut_status_tab) <- c(
+  "n_normal", "n_overnourished", "n_undernourished", 
+  "prop_normal", "prop_overnourished", "prop_undernourished"
+)
+
+### Add mean bmi-for-age z-score to table ----
+nut_status_tab <- data.frame(
+  mean_bfaz, nut_status_tab
+)
+
+### Arrange table columns ----
+nut_status_tab <- nut_status_tab[ , c("mean_bfaz", "n_normal", "prop_normal", "n_overnourished", "prop_overnourished", "n_undernourished", "prop_undernourished")]
+
+knitr::kable(x = nut_status_tab)
+```
 
 ## Task 6: Statistical tests
 
 Knowing what you know now about performing statistical tests from your Epi/Stats lectures, please answer the following questions by writing appropriate R code/script:
 
 * Is there a difference between the mean BMI-for-age z-score of male students compared to the female students?
+
+
 
 * Is there a difference between the proportion of undernourished male students compared to undernourished female students?
 
